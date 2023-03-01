@@ -15,7 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
  * @since 2021-12-22
  */
 public interface IUserService extends IService<User> {
-    Result sendCode(String phone, HttpServletRequest request);
+    Result sendCode(String phone);
 
-    Result login(LoginFormDTO loginForm, HttpServletRequest request);
+    Result login(LoginFormDTO loginForm);
 }

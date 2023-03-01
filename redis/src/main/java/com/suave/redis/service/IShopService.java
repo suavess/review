@@ -1,6 +1,7 @@
 package com.suave.redis.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.suave.redis.dto.Result;
 import com.suave.redis.entity.Shop;
 
 /**
@@ -12,5 +13,9 @@ import com.suave.redis.entity.Shop;
  * @since 2021-12-22
  */
 public interface IShopService extends IService<Shop> {
+
+    Result queryById(Long id);
+
+    Result update(Shop shop);
 
 }

@@ -6,6 +6,7 @@ import com.suave.redis.dto.Result;
 import com.suave.redis.entity.UserInfo;
 import com.suave.redis.service.IUserInfoService;
 import com.suave.redis.service.IUserService;
+import com.suave.redis.utils.UserHolder;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,8 +41,8 @@ public class UserController {
      * 发送手机验证码
      */
     @PostMapping("code")
-    public Result sendCode(@RequestParam("phone") String phone, HttpServletRequest request) {
-        return userService.sendCode(phone, request);
+    public Result sendCode(@RequestParam("phone") String phone) {
+        return userService.sendCode(phone);
     }
 
     /**
@@ -50,8 +51,8 @@ public class UserController {
      * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
      */
     @PostMapping("/login")
-    public Result login(@RequestBody LoginFormDTO loginForm, HttpServletRequest request) {
-        return userService.login(loginForm, request);
+    public Result login(@RequestBody LoginFormDTO loginForm) {
+        return userService.login(loginForm);
     }
 
     /**
@@ -67,8 +68,7 @@ public class UserController {
 
     @GetMapping("/me")
     public Result me() {
-        // TODO 获取当前登录的用户并返回
-        return Result.fail("功能未完成");
+        return Result.ok(UserHolder.getUser());
     }
 
     @GetMapping("/info/{id}")
