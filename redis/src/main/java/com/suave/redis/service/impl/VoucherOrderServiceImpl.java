@@ -1,5 +1,6 @@
 package com.suave.redis.service.impl;
 
+import cn.hutool.extra.spring.SpringUtil;
 import com.suave.redis.dto.Result;
 import com.suave.redis.entity.SeckillVoucher;
 import com.suave.redis.entity.Voucher;
@@ -34,7 +35,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private RedisIdWorker redisIdWorker;
 
     @Override
-    @Transactional
     public Result seckillVoucher(Long voucherId) {
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
         if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
@@ -46,15 +46,29 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if (voucher.getStock() < 1) {
             return Result.fail("库存不足");
         }
-        boolean success = seckillVoucherService.update().setSql("stock = stock - 1").eq("voucher_id", voucherId).update();
+        Long userId = UserHolder.getUser().getId();
+        synchronized (userId.toString().intern()) {
+            return SpringUtil.getBean(VoucherOrderServiceImpl.class).createVoucherOder(voucherId);
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Result createVoucherOder(Long voucherId) {
+        // 一人一单
+        Long userId = UserHolder.getUser().getId();
+        Long count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+        if (count > 0) {
+            return Result.fail("该用户已经购买过了");
+        }
+        boolean success = seckillVoucherService.update().setSql("stock = stock - 1").eq("voucher_id", voucherId).gt("stock", 0).update();
         if (!success) {
             return Result.fail("库存不足");
         }
         VoucherOrder voucherOrder = new VoucherOrder();
         long orderId = redisIdWorker.nextId("order");
         voucherOrder.setId(orderId);
-        Long userId = UserHolder.getUser().getId();
         voucherOrder.setUserId(userId);
+        voucherOrder.setVoucherId(voucherId);
         save(voucherOrder);
         return Result.ok(orderId);
     }
