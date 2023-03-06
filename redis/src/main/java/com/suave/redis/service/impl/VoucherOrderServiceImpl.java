@@ -10,11 +10,15 @@ import com.suave.redis.service.ISeckillVoucherService;
 import com.suave.redis.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.suave.redis.utils.RedisIdWorker;
+import com.suave.redis.utils.SimpleRedisLock;
 import com.suave.redis.utils.UserHolder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.rmi.server.ExportException;
 import java.time.LocalDateTime;
 
 /**
@@ -25,6 +29,7 @@ import java.time.LocalDateTime;
  * @author 虎哥
  * @since 2021-12-22
  */
+@Slf4j
 @Service
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
 
@@ -33,6 +38,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Autowired
     private RedisIdWorker redisIdWorker;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -47,8 +55,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         Long userId = UserHolder.getUser().getId();
-        synchronized (userId.toString().intern()) {
+        SimpleRedisLock simpleRedisLock = new SimpleRedisLock("voucherOrder" + userId, stringRedisTemplate);
+        if (!simpleRedisLock.tryLock(1200)) {
+            seckillVoucher(voucherId);
+        }
+        try {
             return SpringUtil.getBean(VoucherOrderServiceImpl.class).createVoucherOder(voucherId);
+        } finally {
+            simpleRedisLock.unlock();
         }
     }
 
