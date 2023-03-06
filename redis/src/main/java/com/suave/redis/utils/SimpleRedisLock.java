@@ -1,9 +1,13 @@
 package com.suave.redis.utils;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -14,15 +18,20 @@ import java.util.concurrent.TimeUnit;
  * @since 2023/03/06 13:43
  */
 public class SimpleRedisLock implements ILock {
-
     private String name;
     private StringRedisTemplate stringRedisTemplate;
-
     public static final String KEY_PREFIX = "lock:";
+    public static final DefaultRedisScript<Long> REDIS_SCRIPT;
 
     public SimpleRedisLock(String name, StringRedisTemplate stringRedisTemplate) {
         this.name = name;
         this.stringRedisTemplate = stringRedisTemplate;
+    }
+
+    static {
+        REDIS_SCRIPT = new DefaultRedisScript<>();
+        REDIS_SCRIPT.setLocation(new ClassPathResource("unlock.lua"));
+        REDIS_SCRIPT.setResultType(Long.class);
     }
 
     @Override
@@ -35,8 +44,6 @@ public class SimpleRedisLock implements ILock {
     @Override
     public void unlock() {
         String value = stringRedisTemplate.opsForValue().get(KEY_PREFIX + name);
-        if (Objects.equals(value, Thread.currentThread().getId() + "")) {
-            stringRedisTemplate.delete(KEY_PREFIX + name);
-        }
+        stringRedisTemplate.execute(REDIS_SCRIPT, Collections.singletonList(KEY_PREFIX + name), value);
     }
 }
