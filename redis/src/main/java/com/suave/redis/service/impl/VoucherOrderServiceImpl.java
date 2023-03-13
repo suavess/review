@@ -1,24 +1,23 @@
 package com.suave.redis.service.impl;
 
 import cn.hutool.extra.spring.SpringUtil;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.suave.redis.dto.Result;
 import com.suave.redis.entity.SeckillVoucher;
-import com.suave.redis.entity.Voucher;
 import com.suave.redis.entity.VoucherOrder;
 import com.suave.redis.mapper.VoucherOrderMapper;
 import com.suave.redis.service.ISeckillVoucherService;
 import com.suave.redis.service.IVoucherOrderService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.suave.redis.utils.RedisIdWorker;
-import com.suave.redis.utils.SimpleRedisLock;
 import com.suave.redis.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.rmi.server.ExportException;
 import java.time.LocalDateTime;
 
 /**
@@ -42,6 +41,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    @Autowired
+    private RedissonClient redissonClient;
+
     @Override
     public Result seckillVoucher(Long voucherId) {
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
@@ -55,14 +57,19 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         Long userId = UserHolder.getUser().getId();
-        SimpleRedisLock simpleRedisLock = new SimpleRedisLock("voucherOrder" + userId, stringRedisTemplate);
-        if (!simpleRedisLock.tryLock(1200)) {
+        RLock lock = redissonClient.getLock("voucherOrder" + userId);
+        if (lock.tryLock()) {
             seckillVoucher(voucherId);
         }
+        // SimpleRedisLock simpleRedisLock = new SimpleRedisLock("voucherOrder" + userId, stringRedisTemplate);
+        // if (!simpleRedisLock.tryLock(1200)) {
+        //     seckillVoucher(voucherId);
+        // }
         try {
             return SpringUtil.getBean(VoucherOrderServiceImpl.class).createVoucherOder(voucherId);
         } finally {
-            simpleRedisLock.unlock();
+            // simpleRedisLock.unlock();
+            lock.unlock();
         }
     }
 
